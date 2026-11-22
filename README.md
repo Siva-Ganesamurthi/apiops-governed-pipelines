@@ -153,6 +153,21 @@ Values that differ between environments (backend URLs, client IDs, Key Vault ref
 
 Pull requests from the extractor are squash-merged, so one merge equals one commit, and the default mode publishes exactly that change. If you merged something else afterwards (for example documentation), the run warns that the latest commit changed no artifacts and nothing is published. Use `all-artifacts` in that case, or to bring a new environment up to date. A commit that only changes a publisher configuration also publishes nothing in the default mode.
 
+### One branch for every environment
+
+There is no branch per environment. Every environment is published from `main`, and promotion means publishing the same commit to the next environment, behind that environment's approvals.
+
+- **Why not a branch per environment?** Environments differ only in their values, and those live in `configurations/<region>/<environment>/`, not in the artifacts. With a branch per environment, the same change is merged several times and the branches drift apart. Production can then receive something Testing never saw. With one branch, the commit you tested in Testing is the commit you publish to Production.
+- **What's deployed where:** open **Pipelines → Environments → `apiops-<environment>` → Deployments**. It lists every run against that environment, and each run shows the commit it published. Dry runs appear there too; the stage name of each run ("Dry run …" or "Publish …") tells them apart.
+- **Publishing an earlier commit:** if `main` has moved on (say a documentation commit after the merge you want to promote), queue the run on that commit instead of the tip. It still runs from `main`, so Branch control passes:
+
+  ```bash
+  az pipelines run --name "Run ApiOps Publisher" --branch main --commit-id <merge-commit> \
+    --parameters region=WestUS environment=Production mode=changes-in-latest-commit dryRun=true
+  ```
+
+- **Hotfixes** are pull requests to `main` like any other change. Publish them through the environments in order, or straight to Production when the fix can't wait. Production's approvals still apply.
+
 ## Settings
 
 [`pipelines/templates/variables.yaml`](pipelines/templates/variables.yaml):
@@ -181,6 +196,7 @@ Only `Development` may publish from any branch. To change that rule, edit `enfor
 - **One stage built from parameters, not one stage per target.** Names are computed from the selected values at compile time, so adding a target never means copying a stage. Only the selected target's resources are referenced, so Azure DevOps only asks for permission to those.
 - **The service connection is chosen by naming convention, not from a variable group.** Service connections are resolved when the pipeline compiles, before variable groups load.
 - **Extraction is a deployment job too.** Reading production configuration is as sensitive as writing it.
+- **One branch, `main`, for every environment.** Promotion is the same commit published again behind the next environment's approvals, not a merge between branches. See [One branch for every environment](#one-branch-for-every-environment).
 - **Scripts instead of inline code.** Every step calls a file in `scripts/`, so the logic can be read, reviewed and tested outside a pipeline.
 - **Placeholders are replaced by a script, not a marketplace task.** There is no extension to install, and a missing value fails the run. Placeholders must be inside double quotes so values can be escaped safely.
 - **No secrets in the pipeline.** The CLI runs inside the Azure CLI task, which signs in with the target's service connection. The CLI's `DefaultAzureCredential` picks up that session, so workload identity federation works without client secrets or tokens in variables.
