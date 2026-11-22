@@ -1,0 +1,58 @@
+# APIOps extractor
+#
+# Extracts the selected API Management instance into files, lints the API definitions
+# with Spectral and opens a pull request into the release branch (main by default).
+#
+# Naming conventions. Create these before the first run (see README):
+#   Variable group ............ apiops-<region>-<environment>   (lowercase)
+#   Azure DevOps environment .. apiops-<environment>   (environment in lowercase)
+#   Service connection ........ apiops-<environment>   (environment in lowercase)
+#
+# Keep the region and environment lists identical in run-publisher.yaml.
+
+trigger: none
+pr: none
+
+parameters:
+  - name: region
+    displayName: Region
+    type: string
+    default: WestUS
+    values:
+      - EastUS
+      - WestUS
+      - WestEurope
+
+  - name: environment
+    displayName: Environment to extract from
+    type: string
+    default: Development
+    values:
+      - Development
+      - Testing
+      - UAT
+      - Production
+
+stages:
+  - stage: extract
+    displayName: Extract ${{ parameters.region }} / ${{ parameters.environment }}
+    variables:
+      - template: templates/variables.yaml
+      - group: apiops-${{ lower(parameters.region) }}-${{ lower(parameters.environment) }}
+    jobs:
+      # A deployment job, so any approvals and checks on the environment apply to
+      # extraction too: reading Production needs the same sign-off as writing to it.
+      - deployment: extract
+        displayName: Extract, lint and open pull request
+        environment: apiops-${{ lower(parameters.environment) }}
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/steps-extract.yaml
+                  parameters:
+                    region: ${{ lower(parameters.region) }}
+                    environment: ${{ lower(parameters.environment) }}
+                    serviceConnection: apiops-${{ lower(parameters.environment) }}

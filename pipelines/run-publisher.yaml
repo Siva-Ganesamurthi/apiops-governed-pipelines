@@ -1,0 +1,76 @@
+# APIOps publisher
+#
+# Publishes the artifacts on the branch this run was queued from (normally main) to the
+# selected API Management instance, applying that target's configuration overrides.
+#
+# Naming conventions. Create these before the first run (see README):
+#   Variable group ............ apiops-<region>-<environment>   (lowercase)
+#   Azure DevOps environment .. apiops-<environment>   (environment in lowercase)
+#   Service connection ........ apiops-<environment>   (environment in lowercase)
+#
+# Keep the region and environment lists identical in run-extractor.yaml.
+
+trigger: none
+pr: none
+
+parameters:
+  - name: region
+    displayName: Region
+    type: string
+    default: WestUS
+    values:
+      - EastUS
+      - WestUS
+      - WestEurope
+
+  - name: environment
+    displayName: Environment to publish to
+    type: string
+    default: Development
+    values:
+      - Development
+      - Testing
+      - UAT
+      - Production
+
+  - name: mode
+    displayName: What to publish
+    type: string
+    default: changes-in-latest-commit
+    values:
+      - changes-in-latest-commit   # changed and deleted artifacts in the latest commit
+      - all-artifacts              # every artifact in the folder; deletes nothing
+
+  - name: dryRun
+    displayName: Dry run (log what would change, change nothing)
+    type: boolean
+    default: false
+
+stages:
+  - stage: publish
+    ${{ if eq(parameters.dryRun, true) }}:
+      displayName: Dry run ${{ parameters.region }} / ${{ parameters.environment }}
+    ${{ else }}:
+      displayName: Publish ${{ parameters.region }} / ${{ parameters.environment }}
+    variables:
+      - template: templates/variables.yaml
+      - group: apiops-${{ lower(parameters.region) }}-${{ lower(parameters.environment) }}
+    jobs:
+      - deployment: publish
+        displayName: Publish to API Management
+        environment: apiops-${{ lower(parameters.environment) }}
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/steps-publish.yaml
+                  parameters:
+                    region: ${{ lower(parameters.region) }}
+                    environment: ${{ lower(parameters.environment) }}
+                    serviceConnection: apiops-${{ lower(parameters.environment) }}
+                    mode: ${{ parameters.mode }}
+                    dryRun: ${{ parameters.dryRun }}
+                    # Outside Development, only the release branch may publish.
+                    enforceReleaseBranch: ${{ ne(parameters.environment, 'Development') }}

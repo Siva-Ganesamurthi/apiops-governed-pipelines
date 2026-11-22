@@ -1,0 +1,30 @@
+# Example extractor configuration (APIOps CLI filter file, passed as --filter).
+# Copy to configurations/<region>/<environment>/configuration.extractor.yaml and replace
+# the example names with your own.
+#
+#   key left out  -> extract every resource of that type
+#   list of names -> extract only those
+#   []            -> extract none
+#
+# Wildcards (*, ?) and quoted exclusions ('!name') work too. Resources a selected resource
+# depends on (for example the named values its policy uses) are extracted as well.
+
+apis:
+  - orders-api
+  - customers-api
+
+backends:
+  - orders-backend
+
+namedValues:
+  - orders-backend-url
+  - orders-client-secret
+
+products:
+  - partners
+
+policyFragments:
+  - cors-defaults
+
+# Don't extract subscriptions: their keys are environment-specific.
+subscriptions: []

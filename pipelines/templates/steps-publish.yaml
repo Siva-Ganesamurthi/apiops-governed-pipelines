@@ -1,0 +1,95 @@
+# Guard → resolve configuration → publish (or dry run) → summarise.
+
+parameters:
+  - name: region
+    type: string
+  - name: environment
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: mode
+    type: string
+    values:
+      - changes-in-latest-commit
+      - all-artifacts
+  - name: dryRun
+    type: boolean
+    default: false
+  - name: enforceReleaseBranch
+    type: boolean
+    default: true
+
+steps:
+  # Full history: the CLI diffs the commit against its parent. A shallow clone has no
+  # parent, and the CLI would then publish everything as new.
+  - checkout: self
+    fetchDepth: 0
+
+  - task: PowerShell@2
+    displayName: Check branch and what will be published
+    inputs:
+      pwsh: true
+      targetType: filePath
+      filePath: $(Build.SourcesDirectory)/scripts/Test-PublishPreconditions.ps1
+      arguments: >-
+        -RepositoryPath '$(Build.SourcesDirectory)'
+        -ArtifactsFolder '$(ARTIFACTS_FOLDER)'
+        -Mode ${{ parameters.mode }}
+        -SourceBranch '$(Build.SourceBranch)'
+        -ReleaseBranch '$(RELEASE_BRANCH)'
+        -EnforceReleaseBranch ${{ parameters.enforceReleaseBranch }}
+
+  - template: steps-install-apiops.yaml
+
+  - task: PowerShell@2
+    displayName: Resolve publisher configuration
+    inputs:
+      pwsh: true
+      targetType: filePath
+      filePath: $(Build.SourcesDirectory)/scripts/Resolve-PublisherConfiguration.ps1
+      arguments: >-
+        -SourcePath '$(Build.SourcesDirectory)/configurations/${{ parameters.region }}/${{ parameters.environment }}/configuration.publisher.yaml'
+        -DestinationPath '$(Agent.TempDirectory)/apiops/configuration.publisher.yaml'
+    # Secret variables are hidden from scripts unless mapped here. Prefer Key Vault
+    # references in the configuration instead. To use a secret variable anyway:
+    # env:
+    #   NV_MY_SECRET: $(NV_MY_SECRET)
+
+  # The AzureCLI task signs in with the target's service connection; the CLI uses that session.
+  - task: AzureCLI@2
+    ${{ if eq(parameters.dryRun, true) }}:
+      displayName: Dry run against $(APIM_NAME) (no changes)
+    ${{ else }}:
+      displayName: Publish to $(APIM_NAME)
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: pscore
+      scriptLocation: scriptPath
+      scriptPath: $(Build.SourcesDirectory)/scripts/Invoke-ApiOpsTool.ps1
+      arguments: >-
+        -Command publish
+        -CliPath '$(APIOPS_CLI_PATH)'
+        -ServiceName '$(APIM_NAME)'
+        -ResourceGroupName '$(APIM_RESOURCE_GROUP)'
+        -SubscriptionId '$(AZURE_SUBSCRIPTION_ID)'
+        -ArtifactsPath '$(Build.SourcesDirectory)/$(ARTIFACTS_FOLDER)'
+        -OverridesPath '$(APIOPS_PUBLISHER_CONFIGURATION)'
+        -PublishMode ${{ parameters.mode }}
+        -CommitId '$(Build.SourceVersion)'
+        -DryRun ${{ parameters.dryRun }}
+
+  - task: PowerShell@2
+    displayName: Write run summary
+    inputs:
+      pwsh: true
+      targetType: filePath
+      filePath: $(Build.SourcesDirectory)/scripts/Write-RunSummary.ps1
+      arguments: >-
+        -Operation Publish
+        -Region '${{ parameters.region }}'
+        -Environment '${{ parameters.environment }}'
+        -ServiceName '$(APIM_NAME)'
+        -PublishMode ${{ parameters.mode }}
+        -DryRun ${{ parameters.dryRun }}
+        -CommitId '$(Build.SourceVersion)'
+        -OutputPath '$(Agent.TempDirectory)/apiops-summary.md'

@@ -1,0 +1,18 @@
+# Installs Node.js and the pinned APIOps CLI (APIOPS_CLI_VERSION) from npm.
+# Sets APIOPS_CLI_PATH for the following steps.
+
+steps:
+  - task: UseNode@1
+    displayName: Use Node.js $(NODE_VERSION)
+    inputs:
+      version: $(NODE_VERSION)
+
+  - task: PowerShell@2
+    displayName: Install APIOps CLI $(APIOPS_CLI_VERSION)
+    inputs:
+      pwsh: true
+      targetType: filePath
+      filePath: $(Build.SourcesDirectory)/scripts/Install-ApiOpsTool.ps1
+      arguments: >-
+        -Version '$(APIOPS_CLI_VERSION)'
+        -DestinationPath '$(Agent.TempDirectory)/apiops-cli'

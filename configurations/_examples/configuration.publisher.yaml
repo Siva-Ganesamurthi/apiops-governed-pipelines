@@ -1,0 +1,27 @@
+# Example publisher configuration (APIOps CLI overrides file, passed as --overrides).
+# Copy to configurations/<region>/<environment>/configuration.publisher.yaml for every
+# target whose values differ from the extracted source.
+#
+# {#NAME#} placeholders are replaced with the variable NAME from the target's variable
+# group before publishing (the CLI does not replace them itself). Keep them inside double
+# quotes. A missing variable fails the run.
+
+namedValues:
+  - name: orders-backend-url
+    properties:
+      displayName: orders-backend-url
+      value: "{#NV_ORDERS_BACKEND_URL#}"
+
+  # Secrets: reference Key Vault instead of passing the value through the pipeline.
+  - name: orders-client-secret
+    properties:
+      displayName: orders-client-secret
+      secret: true
+      keyVault:
+        secretIdentifier: "{#NV_ORDERS_CLIENT_SECRET_KV_URL#}"
+        identityClientId: "{#NV_KV_IDENTITY_CLIENT_ID#}"
+
+backends:
+  - name: orders-backend
+    properties:
+      url: "{#NV_ORDERS_BACKEND_URL#}"

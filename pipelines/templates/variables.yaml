@@ -1,0 +1,30 @@
+# Shared settings for both pipelines.
+# A target's variable group can override any of these, because the group is listed after
+# this template in each stage.
+
+variables:
+  # APIOps CLI version (npm @azure-tools/apiops-cli). An exact version, never 'latest':
+  # upgrading APIOps means changing this, deliberately.
+  - name: APIOPS_CLI_VERSION
+    value: 1.0.5
+
+  # Folder (repository root relative) that holds the extracted APIM artifacts.
+  # apim-artifacts is the APIOps CLI default.
+  - name: ARTIFACTS_FOLDER
+    value: apim-artifacts
+
+  # Extractor pull requests target this branch; outside Development, only this branch may publish.
+  - name: RELEASE_BRANCH
+    value: main
+
+  # advisory: lint issues are reported but never block. blocking: error-severity issues
+  # fail the extraction, so no pull request is opened.
+  - name: LINT_MODE
+    value: advisory
+
+  - name: SPECTRAL_CLI_VERSION
+    value: 6.17.0
+
+  # Node.js for the APIOps CLI (needs 22 or later) and Spectral.
+  - name: NODE_VERSION
+    value: 24.x

@@ -1,0 +1,29 @@
+# Spectral ruleset for API definitions extracted from Azure API Management.
+#
+# Builds on Spectral's built-in OpenAPI rules. Severities are tuned for APIM exports:
+# things that break consumers are errors; documentation gaps start as warnings.
+# Raise a rule to error once your APIs are clean against it.
+# Rule reference: https://docs.stoplight.io/docs/spectral/4dec24461f3af-open-api-rules
+
+extends:
+  - spectral:oas
+
+rules:
+  # Break client generation or routing: errors.
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-parameters: error
+  path-params: error
+  operation-success-response: error
+  oas3-schema: error
+
+  # Documentation quality: warnings until your APIs are clean.
+  info-description: warn
+  operation-description: warn
+  operation-tags: warn
+  oas3-parameter-description: warn
+
+  # APIM controls the public server URL and contact details, so these add noise.
+  info-contact: off
+  oas3-api-servers: off
+  oas3-server-not-example.com: off
